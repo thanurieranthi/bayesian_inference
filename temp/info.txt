@@ -1,0 +1,6 @@
+tmux attach -t jupyter
+tmux kill-session -t jupyter
+tmux kill-session -t ngrok
+tmux ls
+Ctrl + B  then  D
+tmux new -s ngrok

@@ -1,0 +1,24 @@
+name: bayesian_env
+channels:
+  - conda-forge
+  - nvidia
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pip
+  - jupyterlab
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - seaborn
+  - tqdm
+  - ipykernel
+  - pip:
+      # JAX with CUDA (replace CUDA version if needed)
+      - --find-links https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+      - jax[cuda12_pip]
+      - numpyro
+      - arviz
+      - notebook
