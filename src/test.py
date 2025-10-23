@@ -32,9 +32,9 @@ def main() -> None:
 		num_warmup=1500,
 		num_samples=3000,
 		num_chains=1,
-		progress_bar=False,
+		progress_bar=True,
 		platform="cpu",
-		chain_method="sequential",
+		chain_method="sequential"
 	)
 
 	posterior = summarise_posterior(mcmc)
