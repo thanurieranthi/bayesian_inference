@@ -4,3 +4,5 @@ tmux kill-session -t ngrok
 tmux ls
 Ctrl + B  then  D
 tmux new -s ngrok
+jupyter notebook --ip=0.0.0.0 -notebook-dir=/new_repo/baysian/bayesian_inference/ --no-browser --port=8888
+ngrok http 8888
