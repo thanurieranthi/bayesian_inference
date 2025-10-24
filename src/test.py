@@ -1,6 +1,11 @@
 """Example driver for the Bayesian ground-motion model."""
 
+import os
 from pathlib import Path
+
+# Force CPU execution unless the user explicitly opts in to GPU support.
+os.environ.setdefault("JAX_PLATFORM_NAME", "cpu")
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
 import numpy as np
 from jax import random
@@ -29,9 +34,9 @@ def main() -> None:
 	mcmc = run_inference(
 		data=data,
 		rng_key=rng_key,
-		num_warmup=1500,
-		num_samples=3000,
-		num_chains=1,
+		num_warmup=500,
+		num_samples=1000,
+		num_chains=4,
 		progress_bar=True,
 		platform="cpu",
 		chain_method="sequential"

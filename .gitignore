@@ -1,2 +1,28 @@
 nohup.out
 nohup.log
+
+# Python cache and bytecode files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env/
+.venv/
+venv/
+env/
+
+# Build and distribution artifacts
+build/
+dist/
+*.egg-info/
+
+# Testing and notebook caches
+.pytest_cache/
+.coverage
+.mypy_cache/
+.ipynb_checkpoints/
+
+# JAX/NumPyro compilation caches
+.jax_cache/
+.jax-metacache/

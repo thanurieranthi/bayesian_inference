@@ -7,8 +7,13 @@ posterior predictive checks.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Dict, Iterable, Optional, Tuple, Literal
+
+# Default to CPU execution to avoid platform-specific GPU crashes.
+os.environ.setdefault("JAX_PLATFORM_NAME", "cpu")
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
 import jax
 import jax.numpy as jnp
