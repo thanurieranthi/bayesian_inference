@@ -16,9 +16,8 @@ dependencies:
   - tqdm
   - ipykernel
   - pip:
-      # JAX with CUDA (replace CUDA version if needed)
-      - --find-links https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-      - jax[cuda12_pip]
-      - numpyro
-      - arviz
-      - notebook
+    # JAX CPU-only (suitable for macOS without NVIDIA GPU)
+    - jax[cpu]
+    - numpyro
+    - arviz
+    - notebook
