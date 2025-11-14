@@ -6,6 +6,16 @@ metadata, running MCMC with NUTS, summarising posterior draws, and producing
 posterior predictive checks.
 """
 from __future__ import annotations
+from numpyro.diagnostics import summary as diagnostics_summary
+from numpyro.infer import MCMC, NUTS, Predictive
+from numpyro.distributions import Exponential, HalfNormal, Normal, StudentT
+from numpyro import plate, sample
+import numpyro
+from jax import random
+import pandas as pd
+import numpy as np
+import jax.numpy as jnp
+import jax
 
 import os
 from dataclasses import dataclass
@@ -15,17 +25,6 @@ from typing import Dict, Iterable, Optional, Tuple, Literal
 os.environ.setdefault("JAX_PLATFORM_NAME", "cpu")
 os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pandas as pd
-from jax import random
-
-import numpyro
-from numpyro import plate, sample
-from numpyro.distributions import Exponential, HalfNormal, Normal, StudentT
-from numpyro.infer import MCMC, NUTS, Predictive
-from numpyro.diagnostics import summary as diagnostics_summary
 
 ArrayDict = Dict[str, jnp.ndarray]
 ScalerDict = Dict[str, Tuple[float, float]]
@@ -38,27 +37,6 @@ def _zscore(values: np.ndarray) -> Tuple[np.ndarray, Tuple[float, float]]:
     if sigma == 0.0 or np.isnan(sigma):
         sigma = 1.0
     return (values - mu) / sigma, (mu, sigma)
-
-
-def _ensure_site_class(
-    stations: pd.Series,
-    site_class: Optional[pd.Series] = None,
-    site_class_mapping: Optional[Dict[str, str]] = None,
-) -> pd.Series:
-    """Provide a site-class series, falling back to station-based heuristics."""
-    if site_class is not None:
-        filled = site_class.fillna("Unknown")
-        if filled.eq("Unknown").all() and site_class_mapping:
-            mapped = stations.map(site_class_mapping)
-            filled = mapped.fillna("Unknown")
-        return filled
-
-    if site_class_mapping:
-        mapped = stations.map(site_class_mapping)
-        return mapped.fillna("Unknown")
-
-    # Fallback: coarse proxy built from the first letter of the station code.
-    return stations.str[:1].fillna("U")
 
 
 @dataclass
@@ -103,7 +81,6 @@ def load_ground_motion_data(
     site_class_col: str = "site_class",
     min_magnitude: Optional[float] = None,
     max_records: Optional[int] = None,
-    site_class_mapping: Optional[Dict[str, str]] = None,
 ) -> GroundMotionData:
     """Load metadata and construct arrays for the hierarchical model."""
     df = pd.read_csv(csv_path)
@@ -112,15 +89,13 @@ def load_ground_motion_data(
     if min_magnitude is not None:
         df = df[df["magnitude"] >= min_magnitude]
 
-    if max_records is not None:
-        df = df.head(max_records).copy()
-
     required_cols = [
         intensity_col,
         "magnitude",
         "epicentral_distance",
         "event_depth",
         "station",
+        site_class_col,
     ]
     df = df.dropna(subset=required_cols).copy()
 
@@ -129,25 +104,26 @@ def load_ground_motion_data(
     intensity = intensity.clip(lower=1e-6)
     df["log_intensity"] = np.log(intensity)
 
-    df["event_code"] = df["trace_name"].str.split("_").str[0]
+    df["event_code"] = df["earthquake_id"].astype(str)
+
+    # Filter by event codes if max_records is provided
+    if max_records is not None:
+        unique_events = df["event_code"].unique()
+        selected_events = np.random.choice(unique_events, size=min(
+            max_records, len(unique_events)), replace=False)
+        df = df[df["event_code"].isin(selected_events)].copy()
     df["station_code"] = df["station"].astype(str)
 
-    site_series = None
-    if site_class_col in df.columns:
-        site_series = df[site_class_col].astype(str)
-
-    df["site_class"] = _ensure_site_class(
-        stations=df["station_code"],
-        site_class=site_series,
-        site_class_mapping=site_class_mapping,
-    )
+    # Site class is already in the data
+    df["site_class"] = df[site_class_col].astype(str)
 
     magnitude_scaled, mag_stats = _zscore(df["magnitude"].to_numpy())
     distance_scaled, dist_stats = _zscore(df["epicentral_distance"].to_numpy())
     depth_scaled, depth_stats = _zscore(df["event_depth"].to_numpy())
 
     event_codes, event_categories = pd.factorize(df["event_code"], sort=True)
-    station_codes, station_categories = pd.factorize(df["station_code"], sort=True)
+    station_codes, station_categories = pd.factorize(
+        df["station_code"], sort=True)
     site_codes, site_categories = pd.factorize(df["site_class"], sort=True)
 
     multi_pairs = pd.MultiIndex.from_arrays([event_codes, station_codes])
@@ -230,7 +206,8 @@ def ground_motion_model(
     with plate("event_station_pairs", num_event_station_pairs):
         interaction_effect = sample(
             "xi_event_station",
-            StudentT(df=nu_interaction + 1e-3, loc=0.0, scale=sigma_interaction),
+            StudentT(df=nu_interaction + 1e-3,
+                     loc=0.0, scale=sigma_interaction),
         )
 
     mu = (

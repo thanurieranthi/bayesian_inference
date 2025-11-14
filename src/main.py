@@ -13,6 +13,7 @@ from ground_motion_model import (
     sample_prior,
     summarise_posterior,
 )
+from model_saver import save_model, load_model, save_summary, load_summary
 
 # Force CPU execution unless the user explicitly opts in to GPU support.
 os.environ.setdefault("JAX_PLATFORM_NAME", "cpu")
@@ -21,12 +22,12 @@ os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
 def main() -> None:
     data_path = Path(__file__).resolve().parent.parent / \
-        "data" / "metadata.csv"
+        "data" / "updated_metadata_vel.csv"
 
     data = load_ground_motion_data(
         csv_path=str(data_path),
         min_magnitude=3.0,
-        max_records=1000,
+        max_records=100
     )
 
     rng_key, ppc_key, prior_key = random.split(random.PRNGKey(123), 3)
@@ -45,6 +46,11 @@ def main() -> None:
     posterior = summarise_posterior(mcmc)
     print(posterior.loc[["beta_0", "beta_magnitude",
           "beta_distance", "beta_depth"]])
+
+    # Save the model and summary
+    models_dir = Path(__file__).resolve().parent.parent / "models"
+    save_model(mcmc, str(models_dir / "bhm_model.pkl"))
+    save_summary(posterior, str(models_dir / "posterior_summary.csv"))
 
     ppc = generate_ppc(mcmc, data, ppc_key)
     print("Posterior predictive mean (first five):", ppc["mean"][:5])
