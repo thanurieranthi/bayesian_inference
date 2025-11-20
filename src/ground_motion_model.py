@@ -296,9 +296,9 @@ def ground_motion_model(
 ) -> None:
     """Hierarchical Student-t regression for S-wave ground-motion intensity."""
     beta_0 = sample("beta_0", Normal(0.0, 5.0))
-    beta_mag = sample("beta_magnitude", Normal(0.0, 5.0))
-    beta_dist = sample("beta_distance", Normal(0.0, 5.0))
-    beta_depth = sample("beta_depth", Normal(0.0, 5.0))
+    beta_mag = sample("beta_magnitude", Normal(3, ))  # Normal(0.0, 5.0)
+    beta_dist = sample("beta_distance", Normal(100, 32))  # Normal(0.0, 5.0)
+    beta_depth = sample("beta_depth", Normal(60, 5.0))  # Normal(0.0, 5.0)
 
     sigma_event = sample("sigma_event", HalfNormal(1.0))
     nu_event = sample("nu_event", Exponential(1.0 / 30.0))
