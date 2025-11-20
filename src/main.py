@@ -11,6 +11,7 @@ from ground_motion_model import (
     load_ground_motion_data,
     run_inference,
     sample_prior,
+    summarise_data,
     summarise_posterior,
 )
 from model_saver import save_model, load_model, save_summary, load_summary
@@ -24,11 +25,18 @@ def main() -> None:
     data_path = Path(__file__).resolve().parent.parent / \
         "data" / "updated_metadata_vel.csv"
 
+    # Filter data for specific years (e.g., 2021, 2022, 2023)
+    # Modify this list to include the years you want to analyze
+    selected_years = [2021, 2022, 2023]
+
     data = load_ground_motion_data(
         csv_path=str(data_path),
         min_magnitude=3.0,
-        max_records=100
+        years=selected_years,
     )
+
+    # Display data summary before running inference
+    summarise_data(data)
 
     rng_key, ppc_key, prior_key = random.split(random.PRNGKey(123), 3)
 

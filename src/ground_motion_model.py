@@ -80,14 +80,41 @@ def load_ground_motion_data(
     intensity_col: str = "pga_rotd50",
     site_class_col: str = "site_class",
     min_magnitude: Optional[float] = None,
-    max_records: Optional[int] = None,
+    years: Optional[list[int]] = None,
 ) -> GroundMotionData:
-    """Load metadata and construct arrays for the hierarchical model."""
+    """Load metadata and construct arrays for the hierarchical model.
+
+    Parameters
+    ----------
+    csv_path : str
+        Path to the CSV file containing ground motion data.
+    intensity_col : str
+        Name of the intensity column (default: "pga_rotd50").
+    site_class_col : str
+        Name of the site class column (default: "site_class").
+    min_magnitude : Optional[float]
+        Minimum magnitude threshold for filtering events.
+    years : Optional[list[int]]
+        List of years to include in the analysis (e.g., [2013, 2014, 2015]).
+        If None, all years are included.
+
+    Returns
+    -------
+    GroundMotionData
+        Container with processed arrays for the hierarchical model.
+    """
     df = pd.read_csv(csv_path)
     df = df[df["event_type"].str.lower() == "earthquake"].copy()
 
     if min_magnitude is not None:
         df = df[df["magnitude"] >= min_magnitude]
+
+    # Extract year from trace_name (first 4 digits)
+    df["year"] = df["trace_name"].str[:4].astype(int)
+
+    # Filter by years if provided
+    if years is not None:
+        df = df[df["year"].isin(years)].copy()
 
     required_cols = [
         intensity_col,
@@ -105,13 +132,6 @@ def load_ground_motion_data(
     df["log_intensity"] = np.log(intensity)
 
     df["event_code"] = df["earthquake_id"].astype(str)
-
-    # Filter by event codes if max_records is provided
-    if max_records is not None:
-        unique_events = df["event_code"].unique()
-        selected_events = np.random.choice(unique_events, size=min(
-            max_records, len(unique_events)), replace=False)
-        df = df[df["event_code"].isin(selected_events)].copy()
     df["station_code"] = df["station"].astype(str)
 
     # Site class is already in the data
@@ -155,6 +175,109 @@ def load_ground_motion_data(
     )
 
     return data
+
+
+def summarise_data(
+    data: GroundMotionData,
+    df: Optional[pd.DataFrame] = None,
+) -> None:
+    """Print comprehensive summary statistics of the ground motion data.
+
+    Parameters
+    ----------
+    data : GroundMotionData
+        The processed ground motion data container.
+    df : Optional[pd.DataFrame]
+        The original dataframe (before processing). If provided, shows additional
+        original value statistics.
+    """
+    print("\n" + "="*70)
+    print("BAYESIAN HIERARCHICAL MODEL - DATA SUMMARY")
+    print("="*70)
+
+    # Dataset structure
+    print("\n📊 DATASET STRUCTURE")
+    print("-" * 70)
+    print(f"  Total observations:        {len(data.y):,}")
+    print(f"  Number of events:          {data.num_events:,}")
+    print(f"  Number of stations:        {data.num_stations:,}")
+    print(f"  Number of site classes:    {data.num_site_classes}")
+    print(f"  Event-station pairs:       {data.num_event_station_pairs:,}")
+
+    # Response variable (log intensity)
+    print("\n📈 RESPONSE VARIABLE (Log Intensity)")
+    print("-" * 70)
+    y_values = np.asarray(data.y)
+    print(f"  Mean:                      {y_values.mean():.4f}")
+    print(f"  Std Dev:                   {y_values.std():.4f}")
+    print(f"  Min:                       {y_values.min():.4f}")
+    print(f"  Max:                       {y_values.max():.4f}")
+    print(f"  Median:                    {np.median(y_values):.4f}")
+    print(f"  Q1 (25%):                  {np.percentile(y_values, 25):.4f}")
+    print(f"  Q3 (75%):                  {np.percentile(y_values, 75):.4f}")
+
+    # Predictors (standardized values)
+    print("\n📍 PREDICTORS (Standardized)")
+    print("-" * 70)
+
+    magnitude = np.asarray(data.magnitude)
+    distance = np.asarray(data.distance)
+    depth = np.asarray(data.depth)
+
+    print("  MAGNITUDE:")
+    print(f"    Mean:                    {magnitude.mean():.4f}")
+    print(f"    Std Dev:                 {magnitude.std():.4f}")
+    print(
+        f"    Range:                   [{magnitude.min():.4f}, {magnitude.max():.4f}]")
+
+    print("  EPICENTRAL DISTANCE:")
+    print(f"    Mean:                    {distance.mean():.4f}")
+    print(f"    Std Dev:                 {distance.std():.4f}")
+    print(
+        f"    Range:                   [{distance.min():.4f}, {distance.max():.4f}]")
+
+    print("  EVENT DEPTH:")
+    print(f"    Mean:                    {depth.mean():.4f}")
+    print(f"    Std Dev:                 {depth.std():.4f}")
+    print(
+        f"    Range:                   [{depth.min():.4f}, {depth.max():.4f}]")
+
+    # Scaling factors
+    print("\n🔧 SCALING FACTORS (Original → Standardized)")
+    print("-" * 70)
+    for name, (mu, sigma) in data.scalers.items():
+        print(f"  {name:20s}: μ={mu:.4f}, σ={sigma:.4f}")
+
+    # Hierarchical levels
+    print("\n🏗️  HIERARCHICAL LEVELS")
+    print("-" * 70)
+    event_cat = data.lookups["event_index"]
+    station_cat = data.lookups["station_index"]
+    site_cat = data.lookups["site_class_index"]
+
+    print(f"  Events:                    {len(event_cat)}")
+    print(f"  Stations:                  {len(station_cat)}")
+    print(f"  Site classes:              {len(site_cat)}")
+    if len(site_cat) <= 10:
+        print(f"    - Classes:               {list(site_cat)}")
+
+    # Observations per hierarchical level
+    event_counts = np.bincount(np.asarray(data.event_id))
+    station_counts = np.bincount(np.asarray(data.station_id))
+
+    print("\n  OBSERVATIONS PER EVENT:")
+    print(f"    Mean:                    {event_counts.mean():.1f}")
+    print(f"    Std Dev:                 {event_counts.std():.1f}")
+    print(
+        f"    Min - Max:               {event_counts.min()} - {event_counts.max()}")
+
+    print("\n  OBSERVATIONS PER STATION:")
+    print(f"    Mean:                    {station_counts.mean():.1f}")
+    print(f"    Std Dev:                 {station_counts.std():.1f}")
+    print(
+        f"    Min - Max:               {station_counts.min()} - {station_counts.max()}")
+
+    print("\n" + "="*70 + "\n")
 
 
 def ground_motion_model(
@@ -337,5 +460,6 @@ __all__ = [
     "make_rng_keys",
     "sample_prior",
     "run_inference",
+    "summarise_data",
     "summarise_posterior",
 ]
