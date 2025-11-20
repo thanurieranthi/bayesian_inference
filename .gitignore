@@ -12,6 +12,10 @@ __pycache__/
 venv/
 env/
 
+data/updated_dataset.csv
+data/updated_metadata_vel.csv
+data/updated_metadata.csv
+
 # Build and distribution artifacts
 build/
 dist/
