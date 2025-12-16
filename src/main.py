@@ -22,13 +22,14 @@ os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 def main() -> None:
     """Run Bayesian inference on ground motion data."""
     # Paths
-    data_path = Path(__file__).resolve().parent.parent / "data" / "updated_metadata_vel.csv"
+    data_path = Path(__file__).resolve().parent.parent / \
+        "data" / "metadata_vel.csv"
     models_dir = Path(__file__).resolve().parent.parent / "models"
     plots_dir = Path(__file__).resolve().parent.parent / "plots"
-    
+
     models_dir.mkdir(exist_ok=True)
     plots_dir.mkdir(exist_ok=True)
-    
+
     # Load data
     print("Loading data...")
     data = load_ground_motion_data(
@@ -38,12 +39,13 @@ def main() -> None:
         max_magnitude=5
     )
     print(f"  Loaded {data['n_obs']} observations")
-    print(f"  Events: {data['num_events']}, Stations: {data['num_stations']}, Site classes: {data['num_site_classes']}\n")
-    
+    print(
+        f"  Events: {data['num_events']}, Stations: {data['num_stations']}, Site classes: {data['num_site_classes']}\n")
+
     # Run inference
     print("Running MCMC inference...")
     rng_key, ppc_key, prior_key = random.split(random.PRNGKey(42), 3)
-    
+
     mcmc = run_inference(
         data=data,
         rng_key=rng_key,
@@ -52,24 +54,25 @@ def main() -> None:
         num_chains=4,
         progress_bar=True,
     )
-    
+
     # Summarize posterior
     print("\nPosterior Summary:")
     posterior = summarise_posterior(mcmc)
     print(posterior[["mean", "std"]])
-    
+
     # Save results
     posterior.to_csv(models_dir / "posterior_summary.csv")
-    print(f"\nSaved posterior summary to {models_dir / 'posterior_summary.csv'}")
-    
+    print(
+        f"\nSaved posterior summary to {models_dir / 'posterior_summary.csv'}")
+
     # Save full model samples (needed for advanced plotting like PPC density)
     save_model(mcmc, models_dir / "bhm_model.pkl")
-    
+
     # Generate posterior predictive
     print("\nGenerating posterior predictive samples...")
     ppc = generate_ppc(mcmc, data, ppc_key)
     print(f"  Mean prediction (first 5): {ppc['y_pred_mean'][:5]}")
-    
+
     # Plot residuals
     print("Plotting residuals...")
     plot_predictive_check(
@@ -77,12 +80,12 @@ def main() -> None:
         y_pred_mean=ppc["y_pred_mean"],
         output_dir=plots_dir
     )
-    
+
     # Generate prior
     print("\nSampling from prior...")
     prior_samples = sample_prior(data, prior_key, num_samples=100)
     posterior_samples = mcmc.get_samples()
-    
+
     # Plot comparisons
     print("Creating plots...")
     plot_prior_posterior_pairs(

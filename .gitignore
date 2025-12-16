@@ -13,8 +13,9 @@ venv/
 env/
 
 data/updated_dataset.csv
-data/updated_metadata_vel.csv
-data/updated_metadata.csv
+data/metadata_acc.csv
+data/metadata_vel.csv
+data/metadata.csv
 
 # Build and distribution artifacts
 build/
